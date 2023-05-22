@@ -1,36 +1,48 @@
 pipeline {
-    agent {label 'slavej'}
-    
-    stages {
-        stage('SCM Checkout') {
-            steps {
-                  git credentialsId: 'adfefa6d-169d-402b-a5d7-214ee17bc82b', url: 'https://github.com/raghavendratelang/private-deploy.git'
-            }
-        }
-        
-        stage('Clean') {
-            steps {
-                sh 'mvn clean'
-            }
-        }
-        
-        stage('Build') {
-            steps {
-                sh 'mvn clean install'
-            }
-        }
-        
-        stage('SonarQube Analysis') {
-            steps {
-                withSonarQubeEnv('sonarqubeadmin') {
-                sh 'mvn sonar:sonar'
-                }
-            }
-        }        
-        stage('Deploy to Tomcat') {
-            steps {
-                sh 'cp /home/ubuntu/wrkspace/workspace/16assignment/target/*.war /opt/tomcat/webapps/'
-            }
-        }
-    }
+	agent {
+		label 'slavej'
+	}
+
+	stages {
+		stage('SCM Checkout') {
+			steps {
+				git credentialsId: 'adfefa6d-169d-402b-a5d7-214ee17bc82b', url: 'https://github.com/raghavendratelang/private-deploy.git'
+			}
+		}
+
+		stage('Clean') {
+			steps {
+				sh 'mvn clean'
+			}
+		}
+
+		stage('Build') {
+			steps {
+				sh 'mvn clean install'
+			}
+		}
+
+		stage('SonarQube Analysis') {
+			steps {
+				script {
+					withSonarQubeEnv('sonarqubeadmin') {
+						sh 'mvn sonar:sonar'
+					}
+
+					timeout(time: 1, unit: 'HOURS') {
+						def qg = waitForQualityGate()
+						if (qg.status != 'OK') {
+							error "pipeline aborted due to quality gate failure: ${qg.status}"
+						}
+					}
+				}
+			}
+		}
+
+		stage('Deploy to Tomcat') {
+			steps {
+				sh 'cp /home/ubuntu/wrkspace/workspace/16assignment/target/*.war /opt/tomcat/webapps/'
+			}
+		}
+	}
 }
